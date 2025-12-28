@@ -818,12 +818,6 @@ export default function WritingAssistant() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', paddingLeft: '4px' }}>
-                  <button type="button" className="composer-btn-ghost" aria-label="Add files or options">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                  </button>
                   <button type="button" className="composer-btn-ghost" aria-label="Attach a document">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21.44 11.05 12.5 20a5 5 0 0 1-7.07-7.07l9.55-9.55a3.5 3.5 0 1 1 4.95 4.95l-9.2 9.2a2 2 0 0 1-2.83-2.83L14 7.5" />
@@ -854,21 +848,7 @@ export default function WritingAssistant() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '4px' }}>
-                  <button type="button" className="composer-btn-ghost" aria-label="Dictate with microphone">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 1a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" />
-                      <path d="M19 10a7 7 0 0 1-14 0" />
-                      <line x1="12" y1="19" x2="12" y2="23" />
-                    </svg>
-                  </button>
-                  <button type="button" className="composer-btn-ghost" aria-label="Insert emoji">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="9" />
-                      <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-                      <line x1="9" y1="9" x2="9" y2="9.01" />
-                      <line x1="15" y1="9" x2="15" y2="9.01" />
-                    </svg>
-                  </button>
+
                   <button
                     type="button"
                     className="composer-send-btn"
