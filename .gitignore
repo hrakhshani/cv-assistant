@@ -1,0 +1,12 @@
+
+# env files
+.env
+.env.*
+
+.env
+
+.env
+
+dist/
+.env
+dist/
