@@ -90,8 +90,10 @@ const asideBaseStyle = {
   backgroundColor: '#FFFFFF',
   color: '#0F172A',
   padding: '20px 22px 24px',
-  minHeight: '100vh',
-  overflowY: 'auto'
+  height: '100%',
+  minHeight: 0,
+  overflowY: 'auto',
+  boxSizing: 'border-box'
 };
 
 const buildAnalysisMessages = (content) => [
@@ -905,11 +907,12 @@ export default function WritingAssistant() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
       backgroundColor: '#FAFAF9',
       fontFamily: "'Source Serif 4', Georgia, serif",
       cursor: draggingKeyword ? 'none' : 'default',
-      userSelect: draggingKeyword ? 'none' : 'auto'
+      userSelect: draggingKeyword ? 'none' : 'auto',
+      overflow: 'hidden'
     }}>
       {sharedHead}
 
@@ -982,7 +985,16 @@ export default function WritingAssistant() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 380px',  minHeight: '100vh' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '280px 1fr 380px',
+        gridTemplateRows: '1fr',
+        height: '100%',
+        overflow: 'hidden',
+        columnGap: '20px',
+        padding: '22px 20px 40px',
+        boxSizing: 'border-box'
+      }}>
         <aside
           className="hide-scrollbar"
           style={{
@@ -994,11 +1006,9 @@ export default function WritingAssistant() {
             boxShadow: 'inset -1px 0 0 #E7E5E4',
             topmargin: '22px',
             borderradius: '12px',
-            marginLeft: '20px',
-            marginTop: '22px',
             borderRadius: '12px',
             boxShadow: 'rgba(15, 23, 42, 0.08) 0px 10px 28px',
-            border: '1px solid rgb(231, 229, 228)',
+            border: '1px solid rgb(231, 229, 228)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'left', justifyContent: 'flex-start', gap: '1px' }}>
@@ -1136,9 +1146,11 @@ export default function WritingAssistant() {
 
         <section style={{
           backgroundColor: '#FFFFFF',
-          minHeight: '100vh',
+          height: '100%',
+          minHeight: 0,
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
 
 
@@ -1193,8 +1205,8 @@ export default function WritingAssistant() {
           <div
             className="hide-scrollbar"
             style={{
-              padding: '24px 48px 40px',
               flex: 1,
+              minHeight: 0,
               overflowY: 'auto',
               backgroundColor: '#FAFAF9'
             }}
@@ -1276,11 +1288,9 @@ export default function WritingAssistant() {
             boxShadow: 'inset -1px 0 0 #E7E5E4',
             topmargin: '22px',
             borderradius: '12px',
-            marginLeft: '20px',
-            marginTop: '22px',
             borderRadius: '12px',
             boxShadow: 'rgba(15, 23, 42, 0.08) 0px 10px 28px',
-            border: '1px solid rgb(231, 229, 228)',
+            border: '1px solid rgb(231, 229, 228)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', gap: '8px' }}>
