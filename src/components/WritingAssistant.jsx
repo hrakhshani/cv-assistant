@@ -618,15 +618,90 @@ export default function WritingAssistant() {
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
         }
+
+        .composer-shell {
+          border: 1px solid #E7E5E4;
+          box-shadow: 0 18px 40px rgba(15,23,42,0.12);
+          transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+        }
+
+        .composer-shell:focus-within {
+          border-color: #C7D2FE;
+          box-shadow: 0 20px 44px rgba(42,87,222,0.18);
+          transform: translateY(-1px);
+        }
+
+        .composer-textarea {
+          border: none;
+          outline: none;
+          resize: none;
+          width: 100%;
+          background: transparent;
+          font-family: "'DM Sans', sans-serif";
+          font-size: 15px;
+          line-height: 1.6;
+          color: #111827;
+          padding: 0;
+        }
+
+        .composer-textarea::placeholder {
+          color: #9CA3AF;
+        }
+
+        .composer-btn-ghost {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          border: 1px solid #E7E5E4;
+          background: #F9FAFB;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.16s ease;
+        }
+
+        .composer-btn-ghost:hover {
+          background: #EEF2FF;
+          border-color: #C7D2FE;
+        }
+
+        .composer-send-btn {
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          border: none;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #FFFFFF;
+          background: linear-gradient(135deg, #2a57de 0%, #3b82f6 100%);
+          box-shadow: 0 16px 34px rgba(42,87,222,0.28);
+          cursor: pointer;
+          transition: transform 0.14s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+        }
+
+        .composer-send-btn:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+          box-shadow: none;
+        }
+
+        .composer-send-btn:not(:disabled):hover {
+          transform: translateY(-1px);
+          box-shadow: 0 20px 42px rgba(42,87,222,0.34);
+        }
       `}</style>
     </>
   );
 
   if (!showAnalysis) {
+    const hasText = text.trim().length > 0;
+
     return (
       <div style={{
         minHeight: '100vh',
-        backgroundColor: '#FAFAF9',
+        backgroundColor: '#F4F4F5',
         fontFamily: "'Source Serif 4', Georgia, serif",
         cursor: draggingKeyword ? 'none' : 'default',
         userSelect: draggingKeyword ? 'none' : 'auto'
@@ -637,13 +712,45 @@ export default function WritingAssistant() {
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'flex-end',
-          padding: '40px 20px 72px'
+          justifyContent: 'center',
+          padding: '56px 20px 80px'
         }}>
-          <div style={{ maxWidth: '980px', margin: '0 auto', width: '100%' }}>
+          <div style={{
+            maxWidth: '980px',
+            margin: '0 auto',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '22px'
+          }}>
+            <div style={{ textAlign: 'center', color: '#0F172A' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
+                backgroundColor: '#FFFFFF',
+                borderRadius: '999px',
+                border: '1px solid #E7E5E4',
+                boxShadow: '0 10px 30px rgba(15,23,42,0.08)'
+              }}>
+                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '15px', fontWeight: 700 }}>
+                  Where should we begin?
+                </span>
+              </div>
+              <p style={{
+                marginTop: '10px',
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: '14px',
+                color: '#6B7280'
+              }}>
+                Paste your note or question and we will polish it with AI-powered suggestions.
+              </p>
+            </div>
+
             {analysisError && (
               <div style={{
-                marginBottom: '12px',
+                marginBottom: '4px',
                 padding: '10px 14px',
                 backgroundColor: '#FEF2F2',
                 border: '1px solid #FECACA',
@@ -656,42 +763,119 @@ export default function WritingAssistant() {
               </div>
             )}
 
-            <div style={{
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E7E5E4',
-              borderRadius: '16px',
-              padding: '22px 24px 18px',
-              boxShadow: '0 18px 40px rgba(15,23,42,0.12)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            <div style={{ padding: '0 6px' }}>
+              <div
+                className="composer-shell"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '28px',
+                  padding: '14px 14px 12px',
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr auto',
+                  gap: '12px',
+                  alignItems: 'stretch'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', paddingLeft: '4px' }}>
+                  <button type="button" className="composer-btn-ghost" aria-label="Add files or options">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </button>
+                  <button type="button" className="composer-btn-ghost" aria-label="Attach a document">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21.44 11.05 12.5 20a5 5 0 0 1-7.07-7.07l9.55-9.55a3.5 3.5 0 1 1 4.95 4.95l-9.2 9.2a2 2 0 0 1-2.83-2.83L14 7.5" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', padding: '4px 2px 0', minHeight: '92px' }}>
+                  <textarea
+                    className="composer-textarea hide-scrollbar"
+                    value={text}
+                    onChange={handleTextChange}
+                    placeholder="Ask anything or paste text to improve..."
+                    rows={4}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        if (!hasText) return;
+                        handleAnalyzeNow();
+                      }
+                    }}
+                    style={{
+                      minHeight: '92px',
+                      maxHeight: '220px',
+                      overflowY: 'auto'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '4px' }}>
+                  <button type="button" className="composer-btn-ghost" aria-label="Dictate with microphone">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 1a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" />
+                      <path d="M19 10a7 7 0 0 1-14 0" />
+                      <line x1="12" y1="19" x2="12" y2="23" />
+                    </svg>
+                  </button>
+                  <button type="button" className="composer-btn-ghost" aria-label="Insert emoji">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                      <line x1="9" y1="9" x2="9" y2="9.01" />
+                      <line x1="15" y1="9" x2="15" y2="9.01" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="composer-send-btn"
+                    onClick={handleAnalyzeNow}
+                    disabled={!hasText || isAnalyzing}
+                    aria-label="Analyze text"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 2 11 13" />
+                      <path d="M22 2 15 22 11 13 2 9l20-7Z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
-              <textarea
-                value={text}
-                onChange={handleTextChange}
-                placeholder="Drop your message or paste text to improve..."
-                style={{
-                  width: '100%',
-                  minHeight: '150px',
-                  borderRadius: '12px',
-                  border: '1px solid #D6D3D1',
-                  padding: '14px 16px',
-                  fontFamily: "''DM Sans', sans-serif",
-                  fontSize: '13px',
-                  lineHeight: 1,
-                  resize: 'vertical',
-                  outline: 'none',
-                  color: '#1C1917',
-                  backgroundColor: '#FFFFFF',
-                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
-                }}
-              />
-
-              <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '13px', color: '#6B7280' }}>
-                  Editing clears previous AI suggestions. Run analysis to store this draft in history.
-                </span>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <div style={{
+                marginTop: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                flexWrap: 'wrap'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '13px', color: '#6B7280' }}>
+                    Editing clears previous AI suggestions. Press Ctrl/Cmd + Enter to analyze quickly.
+                  </span>
+                  {isAnalyzing && (
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: '12px',
+                      color: '#0F172A',
+                      backgroundColor: '#EEF2FF',
+                      padding: '6px 10px',
+                      borderRadius: '10px'
+                    }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="1.5">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
+                      </svg>
+                      Working…
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     onClick={() => handleTextChange('')}
                     style={{
@@ -699,55 +883,19 @@ export default function WritingAssistant() {
                       fontSize: '13px',
                       fontWeight: 700,
                       padding: '10px 14px',
-                      backgroundColor: '#F5F5F4',
+                      backgroundColor: '#FFFFFF',
                       color: '#57534E',
                       border: '1px solid #E7E5E4',
                       borderRadius: '10px',
                       cursor: 'pointer',
-                      minWidth: '90px'
+                      minWidth: '90px',
+                      boxShadow: '0 6px 16px rgba(15,23,42,0.08)'
                     }}
                   >
                     Clear
                   </button>
-                  <button
-                    onClick={handleAnalyzeNow}
-                    disabled={isAnalyzing}
-                    style={{
-                      fontFamily: "'DM Sans', sans-serif",
-                      fontSize: '13px',
-                      fontWeight: 800,
-                      padding: '10px 16px',
-                      backgroundColor: isAnalyzing ? '#2a57de' : '#2a57de',
-                      color: isAnalyzing ? '#6287f5' : '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '12px',
-                      cursor: isAnalyzing ? 'not-allowed' : 'pointer',
-                      boxShadow: '0 14px 28px rgba(15,23,42,0.22)',
-                      minWidth: '120px'
-                    }}
-                  >
-                    {isAnalyzing ? 'Working…' : 'Analyze text'}
-                  </button>
                 </div>
               </div>
-
-              {isAnalyzing && (
-                <div style={{
-                  marginTop: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontSize: '13px',
-                  color: '#6B7280'
-                }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1C1917" strokeWidth="1.5">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 7v5l3 2" />
-                  </svg>
-                  <span>Analyzing with OpenAI…</span>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -988,7 +1136,6 @@ export default function WritingAssistant() {
 
         <section style={{
           backgroundColor: '#FFFFFF',
-          borderRight: '1px solid #E7E5E4',
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column'
@@ -1006,11 +1153,7 @@ export default function WritingAssistant() {
                 fontSize: '13px',
                 color: '#57534E'
               }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4aa150" strokeWidth="12.5">
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 7v5l3 2" />
-                </svg>
-                <span>Analyzing with OpenAI…</span>
+
               </div>
               <div style={{
                 height: '6px',
@@ -1126,8 +1269,18 @@ export default function WritingAssistant() {
           className="hide-scrollbar"
           style={{
             ...asideBaseStyle,
-            borderLeft: '1px solid #E7E5E4',
-            boxShadow: 'inset 1px 0 0 #E7E5E4'
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            borderRight: '1px solid #E7E5E4',
+            boxShadow: 'inset -1px 0 0 #E7E5E4',
+            topmargin: '22px',
+            borderradius: '12px',
+            marginLeft: '20px',
+            marginTop: '22px',
+            borderRadius: '12px',
+            boxShadow: 'rgba(15, 23, 42, 0.08) 0px 10px 28px',
+            border: '1px solid rgb(231, 229, 228)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', gap: '8px' }}>
