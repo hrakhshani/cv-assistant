@@ -86,6 +86,14 @@ const categoryLabels = {
   keyword: 'Keywords'
 };
 
+const asideBaseStyle = {
+  backgroundColor: '#FFFFFF',
+  color: '#0F172A',
+  padding: '20px 22px 24px',
+  minHeight: '100vh',
+  overflowY: 'auto'
+};
+
 const buildAnalysisMessages = (content) => [
   {
     role: 'system',
@@ -826,62 +834,64 @@ export default function WritingAssistant() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 380px', minHeight: '100vh' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 380px',  minHeight: '100vh' }}>
         <aside
           className="hide-scrollbar"
           style={{
-            background: 'linear-gradient(180deg, #111827 0%, #1F2937 100%)',
-            color: '#E5E7EB',
-            padding: '20px 18px',
+            ...asideBaseStyle,
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
-            borderRight: '1px solid #0F172A',
-            minHeight: '100vh',
-            overflowY: 'auto'
+            borderRight: '1px solid #E7E5E4',
+            boxShadow: 'inset -1px 0 0 #E7E5E4',
+            topmargin: '22px',
+            borderradius: '12px',
+            marginLeft: '20px',
+            marginTop: '22px',
+            borderRadius: '12px',
+            boxShadow: 'rgba(15, 23, 42, 0.08) 0px 10px 28px',
+            border: '1px solid rgb(231, 229, 228)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #FACC15 0%, #F97316 100%)',
-                color: '#0F172A',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontFamily: "'DM Sans', sans-serif",
-                fontWeight: 800,
-                fontSize: '16px'
-              }}>WA</div>
+          <div style={{ display: 'flex', alignItems: 'left', justifyContent: 'flex-start', gap: '1px' }}>
+            <div style={{ display: 'flex', alignItems: 'left', gap: '10px' }}>
+
               <div>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '13px', fontWeight: 700, color: '#F8FAFC' }}>
-                  Writing assistant
-                </div>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '12px', color: '#CBD5E1' }}>
-                  Conversation history
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '12px', color: '#6B7280' }}>
+                  
                 </div>
               </div>
             </div>
-            <button
-              onClick={handleStartNewSession}
-              style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: '12px',
-                fontWeight: 700,
-                padding: '8px 12px',
-                backgroundColor: '#F8FAFC',
-                color: '#111827',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                boxShadow: '0 8px 24px rgba(15,23,42,0.35)'
-              }}
-            >
-              New
-            </button>
+                            <button
+                  onClick={handleStartNewSession}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    backgroundColor: '#2a57de',
+                    border: '1px solid #2a57de',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    boxShadow: '0 10px 24px rgba(42,87,222,0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  aria-label="New"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </button>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
@@ -890,13 +900,13 @@ export default function WritingAssistant() {
               fontSize: '12px',
               letterSpacing: '0.5px',
               textTransform: 'uppercase',
-              color: '#E5E7EB'
+              color: '#78716C'
             }}>Recent</span>
             <span style={{
               fontFamily: "'DM Sans', sans-serif",
               fontSize: '11px',
-              backgroundColor: '#0EA5E9',
-              color: '#0B1220',
+              backgroundColor: '#EEF2FF',
+              color: '#1D4ED8',
               padding: '4px 8px',
               borderRadius: '10px'
             }}>
@@ -907,19 +917,19 @@ export default function WritingAssistant() {
           {sessions.length === 0 ? (
             <div style={{
               marginTop: '12px',
-              backgroundColor: 'rgba(255,255,255,0.06)',
-              border: '1px dashed rgba(255,255,255,0.12)',
+              backgroundColor: '#F8FAFC',
+              border: '1px dashed #E7E5E4',
               borderRadius: '10px',
               padding: '14px',
               fontFamily: "'DM Sans', sans-serif",
               fontSize: '13px',
-              color: '#CBD5E1',
+              color: '#6B7280',
               lineHeight: 1.5
             }}>
               No analyses yet. Paste a snippet in the center pane to start.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px'}}>
               {sessions.map((session) => {
                 const isActive = session.id === activeSessionId;
                 const sessionScore = Number.isFinite(session.score) ? session.score : null;
@@ -931,21 +941,20 @@ export default function WritingAssistant() {
                     style={{
                       textAlign: 'left',
                       width: '100%',
-                      padding: '12px',
+                      padding: '10px 12px',
                       borderRadius: '10px',
-                      backgroundColor: isActive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${isActive ? 'rgba(255,255,255,0.24)' : 'rgba(255,255,255,0.08)'}`,
-                      color: '#F8FAFC',
+                      backgroundColor: isActive ? '#EEF2FF' : '#FFFFFF',
+                      border: `1px solid ${isActive ? '#C7D2FE' : '#E7E5E4'}`,
+                      color: '#0F172A',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
-                      boxShadow: isActive ? '0 8px 22px rgba(0,0,0,0.25)' : 'none'
+                      boxShadow: isActive ? '0 10px 24px rgba(15,23,42,0.08)' : 'none'
                     }}
                   >
                     <div style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: '6px',
+                      alignItems: 'left',
+                      marginBottom: '4px',
                       fontFamily: "'DM Sans', sans-serif"
                     }}>
                       <span style={{
@@ -958,15 +967,15 @@ export default function WritingAssistant() {
                       }}>
                         {sessionScore !== null ? `${sessionScore}/100` : 'Draft'}
                       </span>
-                      <span style={{ fontSize: '11px', color: '#CBD5E1' }}>
+                      <span style={{ fontSize: '11px', color: '#A8A29E' }}>
                         {formatTimestamp(session.updatedAt)}
                       </span>
                     </div>
                     <div style={{
                       fontFamily: "'Source Serif 4', serif",
-                      fontSize: '14px',
-                      lineHeight: 1.4,
-                      color: '#E5E7EB'
+                      fontSize: '10px',
+                      lineHeight: 2,
+                      color: '#1C1917'
                     }}>
                       {session.title}
                     </div>
@@ -984,36 +993,7 @@ export default function WritingAssistant() {
           display: 'flex',
           flexDirection: 'column'
         }}>
-          <header style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 32px',
-            borderBottom: '1px solid #E7E5E4',
-            position: 'sticky',
-            top: 0,
-            zIndex: 20,
-            backgroundColor: 'rgba(255,255,255,0.92)',
-          backdropFilter: 'blur(6px)',
-          gap: '16px'
-        }}>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: '14px',
-                fontWeight: 600,
-                padding: '8px 16px',
-                backgroundColor: scoreBackground,
-                color: scoreColor,
-                borderRadius: '10px',
-                minWidth: '150px',
-                textAlign: 'center'
-              }}>
-                {scoreLabel}
-              </div>
-            </div>
-          </header>
 
           {isAnalyzing && (
             <div style={{ padding: '12px 32px 0', backgroundColor: '#FFFFFF' }}>
@@ -1145,10 +1125,9 @@ export default function WritingAssistant() {
         <aside
           className="hide-scrollbar"
           style={{
-            backgroundColor: '#FFFFFF',
-            padding: '20px 22px 28px',
-            overflowY: 'auto',
-            minHeight: '100vh'
+            ...asideBaseStyle,
+            borderLeft: '1px solid #E7E5E4',
+            boxShadow: 'inset 1px 0 0 #E7E5E4'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', gap: '8px' }}>
