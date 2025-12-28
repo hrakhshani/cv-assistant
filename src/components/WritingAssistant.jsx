@@ -171,6 +171,8 @@ export default function WritingAssistant() {
   const [insertionIndex, setInsertionIndex] = useState(null);
   
   const editorRef = useRef(null);
+  const previewScrollRef = useRef(null);
+  const suggestionRefs = useRef({});
   const requestIdRef = useRef(0);
   const abortControllerRef = useRef(null);
 
@@ -499,6 +501,33 @@ export default function WritingAssistant() {
     setKeywords(prev => prev.filter(k => k.id !== id));
   }, []);
 
+  const scrollToSuggestion = useCallback((suggestionId) => {
+    if (!suggestionId) return;
+    const target = suggestionRefs.current[suggestionId];
+    if (!target) return;
+
+    const container = previewScrollRef.current;
+    if (!container) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      return;
+    }
+
+    const targetRect = target.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const offsetWithinContainer = targetRect.top - containerRect.top + container.scrollTop;
+    const desiredScrollTop = offsetWithinContainer - container.clientHeight / 2 + targetRect.height / 2;
+
+    container.scrollTo({
+      top: Math.max(0, desiredScrollTop),
+      behavior: 'smooth'
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selectedSuggestion) return;
+    scrollToSuggestion(selectedSuggestion);
+  }, [selectedSuggestion, scrollToSuggestion]);
+
   // Render text with highlights and insertion caret
   const renderText = () => {
     if (!text.trim()) {
@@ -567,7 +596,17 @@ export default function WritingAssistant() {
         parts.push(
           <span
             key={`hl-${s.id}`}
-            onClick={() => setSelectedSuggestion(s.id)}
+            ref={(node) => {
+              if (node) {
+                suggestionRefs.current[s.id] = node;
+              } else {
+                delete suggestionRefs.current[s.id];
+              }
+            }}
+            onClick={() => {
+              setSelectedSuggestion(s.id);
+              scrollToSuggestion(s.id);
+            }}
             onMouseEnter={() => setHoveredSuggestion(s.id)}
             onMouseLeave={() => setHoveredSuggestion(null)}
             style={{
@@ -1204,6 +1243,7 @@ export default function WritingAssistant() {
 
           <div
             className="hide-scrollbar"
+            ref={previewScrollRef}
             style={{
               flex: 1,
               minHeight: 0,
@@ -1493,7 +1533,14 @@ export default function WritingAssistant() {
                     key={s.id}
                     onMouseEnter={() => !draggingKeyword && setHoveredSuggestion(s.id)}
                     onMouseLeave={() => !draggingKeyword && setHoveredSuggestion(null)}
-                    onClick={() => !draggingKeyword && setSelectedSuggestion(isSelected ? null : s.id)}
+                    onClick={() => {
+                      if (draggingKeyword) return;
+                      const nextSelection = isSelected ? null : s.id;
+                      setSelectedSuggestion(nextSelection);
+                      if (nextSelection) {
+                        scrollToSuggestion(nextSelection);
+                      }
+                    }}
                     style={{
                       padding: '12px',
                       borderRadius: '10px',
