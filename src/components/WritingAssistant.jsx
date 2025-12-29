@@ -1046,9 +1046,38 @@ export default function WritingAssistant() {
                       border: '1px solid #E7E5E4',
                       borderRadius: '12px',
                       padding: '12px',
-                      background: '#F9FAFB'
+                      background: '#F9FAFB',
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: '12px'
                     }}
                   />
+
+                  <textarea
+                      className="composer-textarea hide-scrollbar"
+                      value={text}
+                      onChange={handleTextChange}
+                      placeholder="Attach a CV or paste your resume content here..."
+                      rows={4}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault();
+                          if (!hasText) return;
+                          handleAnalyzeNow();
+                        }
+                      }}
+                      style={{
+                        minHeight: '74px',
+                        maxHeight: '140px',
+                        overflowY: 'auto',
+                        border: '1px solid #E7E5E4',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        background: '#F9FAFB',
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontSize: '12px'
+                      }}
+                    />
+                
                 </div>
 
                 <div
@@ -1079,27 +1108,6 @@ export default function WritingAssistant() {
                     />
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', padding: '4px 2px 0', minHeight: '92px' }}>
-                    <textarea
-                      className="composer-textarea hide-scrollbar"
-                      value={text}
-                      onChange={handleTextChange}
-                      placeholder="Attach a CV or paste your resume content here..."
-                      rows={4}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                          e.preventDefault();
-                          if (!hasText) return;
-                          handleAnalyzeNow();
-                        }
-                      }}
-                      style={{
-                        minHeight: '92px',
-                        maxHeight: '220px',
-                        overflowY: 'auto'
-                      }}
-                    />
-                  </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '4px' }}>
 
@@ -1109,6 +1117,7 @@ export default function WritingAssistant() {
                       onClick={handleAnalyzeNow}
                       disabled={!hasText || isAnalyzing || isParsingAttachment}
                       aria-label="Analyze text"
+                      style={{ marginLeft: 'auto' }}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M22 2 11 13" />
@@ -1490,38 +1499,31 @@ export default function WritingAssistant() {
         }}>
 
 
-          {isAnalyzing && (
-            <div style={{ padding: '12px 32px 0', backgroundColor: '#FFFFFF' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                marginBottom: '8px',
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: '13px',
-                color: '#57534E'
-              }}>
-
-              </div>
-              <div style={{
-                height: '6px',
-                backgroundColor: '#E7E5E4',
+        {isAnalyzing && (
+          <div
+            style={{
+              height: '6px',
+              backgroundColor: '#E7E5E4',
+              borderRadius: '999px',
+              overflow: 'hidden',
+              position: 'relative'
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                background:
+                  'linear-gradient(90deg, rgb(200, 238, 211) 0%, rgb(130, 244, 88) 100%)',
                 borderRadius: '999px',
-                overflow: 'hidden',
-                position: 'relative'
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  left: '-40%',
-                  width: '100%',
-                  height: '100%',
-                  background: 'linear-gradient(90deg,rgb(200, 238, 211) 0%,rgb(130, 244, 88) 100%)',
-                  borderRadius: '999px',
-                  animation: 'indeterminate 1s ease-in-out infinite'
-                }} />
-              </div>
-            </div>
-          )}
+                transform: 'translateX(-100%) scaleX(0.4)',
+                animation: 'indeterminate 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite'
+              }}
+            />
+          </div>
+        )}
 
           {analysisError && (
             <div style={{
@@ -1549,41 +1551,7 @@ export default function WritingAssistant() {
             }}
           >
 
-            {jobDescription.trim() && (
-              <section
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #E7E5E4',
-                  borderRadius: '12px',
-                  padding: '18px',
-                  margin: '0 0 16px 0',
-                  boxShadow: '0 8px 22px rgba(15, 23, 42, 0.06)'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
-                    Job description context
-                  </div>
-                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '11px', color: '#6B7280' }}>
-                    Used to tailor CV suggestions
-                  </span>
-                </div>
-                <div style={{
-                  fontFamily: "'Source Serif 4', serif",
-                  fontSize: '14px',
-                  color: '#1F2937',
-                  backgroundColor: '#F9FAFB',
-                  borderRadius: '10px',
-                  border: '1px solid #E5E7EB',
-                  padding: '12px',
-                  whiteSpace: 'pre-wrap',
-                  maxHeight: '160px',
-                  overflowY: 'auto'
-                }}>
-                  {jobDescription}
-                </div>
-              </section>
-            )}
+
 
             <section
               style={{
@@ -1627,7 +1595,7 @@ export default function WritingAssistant() {
                   transition: 'border-color 0.2s ease'
                 }}
               >
-                <div style={{ fontSize: '17px', lineHeight: '1.9', color: '#111827', whiteSpace: 'pre-wrap' }}>
+                <div style={{ fontSize: '14px', lineHeight: '2', color: '#111827', whiteSpace: 'pre-wrap', fontFamily: "'DM Sans', sans-serif"}}>
                   {renderText()}
                 </div>
               </div>
