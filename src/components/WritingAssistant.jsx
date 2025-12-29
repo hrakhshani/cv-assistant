@@ -929,9 +929,9 @@ export default function WritingAssistant() {
           align-items: center;
           justify-content: center;
           color: #FFFFFF;
-          background: linear-gradient(135deg, #2a57de 0%, #3b82f6 100%);
-          box-shadow: 0 16px 34px rgba(42,87,222,0.28);
-          cursor: pointer;
+          background: linear-gradient(135deg,rgb(26, 142, 26) 0%,rgb(25, 169, 53) 100%);
+          box-shadow: 0 16px 34px rgba(133, 241, 131, 0.28);
+          cursor: pointer;  
           transition: transform 0.14s ease, box-shadow 0.16s ease, opacity 0.16s ease;
         }
 
@@ -943,7 +943,7 @@ export default function WritingAssistant() {
 
         .composer-send-btn:not(:disabled):hover {
           transform: translateY(-1px);
-          box-shadow: 0 20px 42px rgba(42,87,222,0.34);
+          box-shadow: 0 20px 42px rgba(69, 217, 36, 0.34);
         }
       `}</style>
     </>
@@ -1119,9 +1119,8 @@ export default function WritingAssistant() {
                       aria-label="Analyze text"
                       style={{ marginLeft: 'auto' }}
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 2 11 13" />
-                        <path d="M22 2 15 22 11 13 2 9l20-7Z" />
+                      <svg className="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m9 5 7 7-7 7"/>
                       </svg>
                     </button>
                   </div>
