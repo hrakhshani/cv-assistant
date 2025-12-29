@@ -70,6 +70,32 @@ const alignSuggestionsToText = (items, content) =>
     })
     .filter(Boolean);
 
+const extractTextFromPdf = async (file) => {
+  const data = new Uint8Array(await file.arrayBuffer());
+  const pdfjsLib = await import('pdfjs-dist');
+  const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.js?url')).default;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  const pages = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    const textItems = content.items
+      .map((item) => item.str)
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+
+    if (textItems) {
+      pages.push(textItems);
+    }
+  }
+
+  return pages.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+};
+
 const categoryColors = {
   correctness: { bg: '#FEE2E2', text: '#DC2626', bar: '#EF4444', light: '#FEF2F2' },
   clarity: { bg: '#DBEAFE', text: '#2563EB', bar: '#3B82F6', light: '#EFF6FF' },
@@ -96,27 +122,63 @@ const asideBaseStyle = {
   boxSizing: 'border-box'
 };
 
-const buildAnalysisMessages = (content) => [
+const buildAnalysisMessages = (content, jobDescription) => [
   {
     role: 'system',
     content:
-      'You are a concise writing assistant that returns JSON describing suggestions to improve academic emails. Keep outputs short and actionable.'
+      'You are a concise writing assistant that returns JSON describing suggestions to improve a CV or resume so it aligns with a job description. Keep outputs short and actionable and only reference positions from the CV text.'
   },
   {
     role: 'user',
-    content: `Analyze the following text and respond with a JSON object containing:
+    content: `Use the job description to tailor the candidate CV. Respond with a JSON object containing:
 - "score": integer from 0-100 (higher is better).
-- "suggestions": up to 6 items. Each item must have id, type ("correctness", "clarity", "engagement", or "delivery"), title, description, original (exact text span), replacement (improved version), startIndex, endIndex (character offsets in the provided text, endIndex exclusive).
-- "keywords": up to 3 missing keywords to add, each with id, keyword, and description.
+- "suggestions": up to 6 items. Each item must have id, type ("correctness", "clarity", "engagement", or "delivery"), title, description, original (exact text span from the CV), replacement (improved version), startIndex, endIndex (character offsets in the CV text, endIndex exclusive). Prioritize suggestions that make the CV better match the job description.
+- "keywords": up to 3 missing keywords to add, each with id, keyword, and description pulled from the job description context.
 
-Use character indexes based on the exact text. If the text is already strong, keep arrays short.
+Job description (context only, do NOT index against this text):
+"""${jobDescription || 'Not provided'}"""
 
-Text to analyze:
+Candidate CV/resume text (use this for indexing):
 """${content}"""`
   }
 ];
 
-async function requestAnalysisFromOpenAI(content, apiKey, signal) {
+const buildKeywordMessages = (jobDescription) => [
+  {
+    role: 'system',
+    content:
+      'You extract concise keyword lists from job descriptions to help candidates tailor their CVs. Respond only with JSON.'
+  },
+  {
+    role: 'user',
+    content: `Given the following job description, which keywords can increase my chance during the interview? Return only a JSON object with a single key "keywords" that contains an array of the most important single words or short phrases (no explanations, no extra keys).
+
+Job description:
+"""${jobDescription}"""`
+  }
+];
+
+const parseKeywordsFromContent = (rawContent) => {
+  if (!rawContent) return [];
+  const trimmed = rawContent.trim();
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.keywords)) return parsed.keywords;
+  } catch (err) {
+    // Fall through to newline parsing
+  }
+
+  return trimmed
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+};
+
+async function requestKeywordsFromOpenAI(jobDescription, apiKey, signal) {
+  if (!jobDescription?.trim()) return [];
+
   const response = await fetch(OPENAI_ENDPOINT, {
     method: 'POST',
     headers: {
@@ -125,9 +187,81 @@ async function requestAnalysisFromOpenAI(content, apiKey, signal) {
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      messages: buildAnalysisMessages(content),
+      messages: buildKeywordMessages(jobDescription),
       temperature: 0.2,
-      max_tokens: 600,
+      max_tokens: 800,
+      response_format: { type: 'json_object' }
+    }),
+    signal
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = payload?.error?.message || 'Unable to extract keywords with OpenAI.';
+    throw new Error(message);
+  }
+
+  const rawContent = payload?.choices?.[0]?.message?.content;
+  if (!rawContent) {
+    throw new Error('OpenAI returned an empty keyword response.');
+  }
+
+  const parsedKeywords = parseKeywordsFromContent(rawContent)
+    .map((kw) => (typeof kw === 'string' ? kw.trim() : ''))
+    .filter(Boolean);
+
+  if (parsedKeywords.length === 0) {
+    throw new Error('OpenAI did not return any keywords.');
+  }
+
+  return parsedKeywords;
+}
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const keywordExistsInText = (content, keyword) => {
+  if (!keyword || !content) return false;
+  const safeKeyword = escapeRegExp(keyword).replace(/\s+/g, '\\s+');
+  const regex = new RegExp(`\\b${safeKeyword}\\b`, 'i');
+  return regex.test(content);
+};
+
+const findMissingKeywords = (keywords, content) => {
+  const seen = new Set();
+  const missing = [];
+
+  keywords.forEach((kw, idx) => {
+    const normalized = (kw || '').trim();
+    if (!normalized) return;
+
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    if (!keywordExistsInText(content, normalized)) {
+      missing.push({
+        id: `kw-${idx}`,
+        keyword: normalized,
+        description: 'Mention this to align with the job description.'
+      });
+    }
+  });
+
+  return missing;
+};
+
+async function requestAnalysisFromOpenAI(content, jobDescription, apiKey, signal) {
+  const response = await fetch(OPENAI_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      messages: buildAnalysisMessages(content, jobDescription),
+      temperature: 0.2,
+      max_tokens: 3000,
       response_format: { type: 'json_object' }
     }),
     signal
@@ -161,6 +295,10 @@ export default function WritingAssistant() {
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState(null);
+  const [jobDescription, setJobDescription] = useState('');
+  const [cvAttachmentName, setCvAttachmentName] = useState(null);
+  const [attachmentError, setAttachmentError] = useState(null);
+  const [isParsingAttachment, setIsParsingAttachment] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -175,6 +313,7 @@ export default function WritingAssistant() {
   const suggestionRefs = useRef({});
   const requestIdRef = useRef(0);
   const abortControllerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const resetFeedbackState = useCallback(() => {
     setSuggestions([]);
@@ -213,7 +352,7 @@ export default function WritingAssistant() {
     keyword: keywords.length
   };
 
-  const runAnalysis = useCallback(async (content) => {
+  const runAnalysis = useCallback(async (content, jobDesc) => {
     const trimmed = content.trim();
     if (!trimmed) {
       if (abortControllerRef.current) {
@@ -250,11 +389,13 @@ export default function WritingAssistant() {
     setAnalysisError(null);
 
     try {
-      const result = await requestAnalysisFromOpenAI(content, apiKey, controller.signal);
+      const extractedKeywords = await requestKeywordsFromOpenAI(jobDesc, apiKey, controller.signal);
+      const missingKeywords = findMissingKeywords(extractedKeywords, content);
+      const result = await requestAnalysisFromOpenAI(content, jobDesc, apiKey, controller.signal);
       if (requestIdRef.current !== requestId) return;
 
       const incomingSuggestions = Array.isArray(result?.suggestions) ? result.suggestions : [];
-      const incomingKeywords = Array.isArray(result?.keywords) ? result.keywords : [];
+      const incomingKeywords = Array.isArray(missingKeywords) ? missingKeywords : [];
       const normalizedSuggestions = alignSuggestionsToText(incomingSuggestions, content);
       const normalizedKeywords = incomingKeywords
         .map((kw, idx) => ({
@@ -284,6 +425,7 @@ export default function WritingAssistant() {
             id: sessionId,
             title: sessionTitle,
             text: content,
+            jobDescription: jobDesc,
             suggestions: normalizedSuggestions,
             keywords: normalizedKeywords,
             score: scoreValue,
@@ -325,16 +467,78 @@ export default function WritingAssistant() {
     setActiveSessionId(null);
   }, [resetFeedbackState]);
 
+  const handleJobDescriptionChange = useCallback((eOrValue) => {
+    const newValue = typeof eOrValue === 'string' ? eOrValue : eOrValue?.target?.value ?? '';
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    setIsAnalyzing(false);
+    resetFeedbackState();
+    setJobDescription(newValue);
+    setActiveSessionId(null);
+  }, [resetFeedbackState]);
+
+  const handleFileChange = useCallback(async (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+
+    setAttachmentError(null);
+    setIsParsingAttachment(true);
+    setAnalysisError(null);
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    try {
+      let parsedText = '';
+      const fileName = file.name || 'CV';
+      const lowerName = fileName.toLowerCase();
+
+      if (file.type === 'text/plain' || lowerName.endsWith('.txt')) {
+        parsedText = (await file.text()).trim();
+      } else if (file.type === 'application/pdf' || lowerName.endsWith('.pdf')) {
+        parsedText = await extractTextFromPdf(file);
+      } else {
+        throw new Error('Please attach a PDF or plain text (.txt) CV.');
+      }
+
+      if (!parsedText) {
+        throw new Error('No readable text found in the selected file.');
+      }
+
+      handleTextChange(parsedText);
+      setCvAttachmentName(fileName);
+    } catch (err) {
+      setCvAttachmentName(null);
+      setAttachmentError(err.message || 'Unable to read the attachment.');
+    } finally {
+      setIsParsingAttachment(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [handleTextChange]);
+
   const handleAnalyzeNow = useCallback(() => {
+    if (isParsingAttachment) {
+      setAnalysisError('Please wait while we finish reading your attached CV.');
+      return;
+    }
+
     const trimmed = text.trim();
     if (!trimmed) {
       setShowAnalysis(false);
-      runAnalysis(text);
+      runAnalysis(text, jobDescription);
       return;
     }
     setShowAnalysis(true);
-    runAnalysis(text);
-  }, [runAnalysis, text]);
+    runAnalysis(text, jobDescription);
+  }, [isParsingAttachment, runAnalysis, text, jobDescription]);
 
   const handleSelectSession = useCallback((sessionId) => {
     const session = sessions.find(s => s.id === sessionId);
@@ -348,12 +552,14 @@ export default function WritingAssistant() {
     setShowAnalysis(true);
     setActiveSessionId(sessionId);
     setText(session.text || '');
+    setJobDescription(session.jobDescription || '');
     setSuggestions(session.suggestions || []);
     setKeywords(session.keywords || []);
     setAiScore(Number.isFinite(session.score) ? session.score : null);
     setHasAnalyzed(true);
     setIsAnalyzing(false);
     setAnalysisError(null);
+    setAttachmentError(null);
     setHoveredSuggestion(null);
     setSelectedSuggestion(null);
   }, [sessions]);
@@ -365,6 +571,13 @@ export default function WritingAssistant() {
     }
 
     setText('');
+    setJobDescription('');
+    setCvAttachmentName(null);
+    setAttachmentError(null);
+    setIsParsingAttachment(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     resetFeedbackState();
     setIsAnalyzing(false);
     setAnalysisError(null);
@@ -810,57 +1023,155 @@ export default function WritingAssistant() {
                 style={{
                   backgroundColor: '#FFFFFF',
                   borderRadius: '28px',
-                  padding: '14px 14px 12px',
-                  display: 'grid',
-                  gridTemplateColumns: 'auto 1fr auto',
-                  gap: '12px',
-                  alignItems: 'stretch'
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', paddingLeft: '4px' }}>
-                  <button type="button" className="composer-btn-ghost" aria-label="Attach a document">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21.44 11.05 12.5 20a5 5 0 0 1-7.07-7.07l9.55-9.55a3.5 3.5 0 1 1 4.95 4.95l-9.2 9.2a2 2 0 0 1-2.83-2.83L14 7.5" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', padding: '4px 2px 0', minHeight: '92px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '12px', fontWeight: 700, color: '#475569' }}>
+                    Job description / target role
+                  </label>
                   <textarea
+                    value={jobDescription}
+                    onChange={handleJobDescriptionChange}
+                    placeholder="Paste the job description you want to match against."
+                    rows={3}
                     className="composer-textarea hide-scrollbar"
-                    value={text}
-                    onChange={handleTextChange}
-                    placeholder="Ask anything or paste text to improve..."
-                    rows={4}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                        e.preventDefault();
-                        if (!hasText) return;
-                        handleAnalyzeNow();
-                      }
-                    }}
                     style={{
-                      minHeight: '92px',
-                      maxHeight: '220px',
-                      overflowY: 'auto'
+                      minHeight: '74px',
+                      maxHeight: '140px',
+                      overflowY: 'auto',
+                      border: '1px solid #E7E5E4',
+                      borderRadius: '12px',
+                      padding: '12px',
+                      background: '#F9FAFB'
                     }}
                   />
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '4px' }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'auto 1fr auto',
+                    gap: '12px',
+                    alignItems: 'stretch'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', paddingLeft: '4px' }}>
+                    <button
+                      type="button"
+                      className="composer-btn-ghost"
+                      onClick={() => fileInputRef.current?.click()}
+                      aria-label="Attach a CV (PDF or text)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21.44 11.05 12.5 20a5 5 0 0 1-7.07-7.07l9.55-9.55a3.5 3.5 0 1 1 4.95 4.95l-9.2 9.2a2 2 0 0 1-2.83-2.83L14 7.5" />
+                      </svg>
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,application/pdf,text/plain,.txt"
+                      style={{ display: 'none' }}
+                      onChange={handleFileChange}
+                    />
+                  </div>
 
-                  <button
-                    type="button"
-                    className="composer-send-btn"
-                    onClick={handleAnalyzeNow}
-                    disabled={!hasText || isAnalyzing}
-                    aria-label="Analyze text"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M22 2 11 13" />
-                      <path d="M22 2 15 22 11 13 2 9l20-7Z" />
-                    </svg>
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', padding: '4px 2px 0', minHeight: '92px' }}>
+                    <textarea
+                      className="composer-textarea hide-scrollbar"
+                      value={text}
+                      onChange={handleTextChange}
+                      placeholder="Attach a CV or paste your resume content here..."
+                      rows={4}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault();
+                          if (!hasText) return;
+                          handleAnalyzeNow();
+                        }
+                      }}
+                      style={{
+                        minHeight: '92px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '4px' }}>
+
+                    <button
+                      type="button"
+                      className="composer-send-btn"
+                      onClick={handleAnalyzeNow}
+                      disabled={!hasText || isAnalyzing || isParsingAttachment}
+                      aria-label="Analyze text"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 2 11 13" />
+                        <path d="M22 2 15 22 11 13 2 9l20-7Z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  flexWrap: 'wrap',
+                  padding: '0 4px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: '12px',
+                    color: attachmentError ? '#991B1B' : '#57534E'
+                  }}>
+                    <span>
+                      {isParsingAttachment
+                        ? 'Reading attachment…'
+                        : cvAttachmentName
+                          ? `Attached: ${cvAttachmentName}`
+                          : 'Attach a PDF or TXT CV to auto-fill the editor.'}
+                    </span>
+                    {cvAttachmentName && !isParsingAttachment && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCvAttachmentName(null);
+                          setAttachmentError(null);
+                        }}
+                        style={{
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontSize: '12px',
+                          color: '#0F172A',
+                          background: '#F1F5F9',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: '8px',
+                          padding: '6px 10px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  {attachmentError && (
+                    <span style={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: '12px',
+                      color: '#991B1B'
+                    }}>
+                      {attachmentError}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -898,7 +1209,14 @@ export default function WritingAssistant() {
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
-                    onClick={() => handleTextChange('')}
+                    onClick={() => {
+                      handleTextChange('');
+                      setCvAttachmentName(null);
+                      setAttachmentError(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                    }}
                     style={{
                       fontFamily: "'DM Sans', sans-serif",
                       fontSize: '13px',
@@ -1022,11 +1340,10 @@ export default function WritingAssistant() {
             flexDirection: 'column',
             gap: '12px',
             borderRight: '1px solid #E7E5E4',
-            boxShadow: 'inset -1px 0 0 #E7E5E4',
             topmargin: '22px',
             borderradius: '12px',
             borderRadius: '12px',
-            boxShadow: 'rgba(15, 23, 42, 0.08) 0px 10px 28px',
+            boxShadow: 'inset -1px 0 0 #E7E5E4, rgba(15, 23, 42, 0.08) 0px 10px 28px',
             border: '1px solid rgb(231, 229, 228)'
           }}
         >
@@ -1232,6 +1549,42 @@ export default function WritingAssistant() {
             }}
           >
 
+            {jobDescription.trim() && (
+              <section
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #E7E5E4',
+                  borderRadius: '12px',
+                  padding: '18px',
+                  margin: '0 0 16px 0',
+                  boxShadow: '0 8px 22px rgba(15, 23, 42, 0.06)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                    Job description context
+                  </div>
+                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '11px', color: '#6B7280' }}>
+                    Used to tailor CV suggestions
+                  </span>
+                </div>
+                <div style={{
+                  fontFamily: "'Source Serif 4', serif",
+                  fontSize: '14px',
+                  color: '#1F2937',
+                  backgroundColor: '#F9FAFB',
+                  borderRadius: '10px',
+                  border: '1px solid #E5E7EB',
+                  padding: '12px',
+                  whiteSpace: 'pre-wrap',
+                  maxHeight: '160px',
+                  overflowY: 'auto'
+                }}>
+                  {jobDescription}
+                </div>
+              </section>
+            )}
+
             <section
               style={{
                 backgroundColor: '#FFFFFF',
@@ -1305,11 +1658,10 @@ export default function WritingAssistant() {
             flexDirection: 'column',
             gap: '12px',
             borderRight: '1px solid #E7E5E4',
-            boxShadow: 'inset -1px 0 0 #E7E5E4',
             topmargin: '22px',
             borderradius: '12px',
             borderRadius: '12px',
-            boxShadow: 'rgba(15, 23, 42, 0.08) 0px 10px 28px',
+            boxShadow: 'inset -1px 0 0 #E7E5E4, rgba(15, 23, 42, 0.08) 0px 10px 28px',
             border: '1px solid rgb(231, 229, 228)'
           }}
         >
