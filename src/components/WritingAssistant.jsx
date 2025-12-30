@@ -10,6 +10,8 @@ const initialKeywords = [];
 const API_KEY_REQUIRED_MESSAGE = 'Enter your OpenAI API key to enable AI-powered suggestions.';
 const API_KEY_STORAGE_KEY = 'writingAssistantApiKey';
 const API_KEY_REMEMBER_KEY = 'writingAssistantRememberApiKey';
+const LAST_CV_TEXT_KEY = 'writingAssistantLastCvText';
+const LAST_CV_NAME_KEY = 'writingAssistantLastCvName';
 
 const makeSessionTitle = (content) => {
   const cleaned = (content || '').replace(/\s+/g, ' ').trim();
@@ -599,6 +601,21 @@ export default function WritingAssistant() {
   }, []);
 
   useEffect(() => {
+    try {
+      const storedText = localStorage.getItem(LAST_CV_TEXT_KEY);
+      const storedName = localStorage.getItem(LAST_CV_NAME_KEY);
+      if (storedText) {
+        setText(storedText);
+        if (storedName) {
+          setCvAttachmentName(storedName);
+        }
+      }
+    } catch (err) {
+      // Ignore storage issues (private mode, etc.)
+    }
+  }, []);
+
+  useEffect(() => {
     if (!hasHydratedApiKey) return;
     try {
       const trimmed = apiKey.trim();
@@ -613,6 +630,22 @@ export default function WritingAssistant() {
       // Ignore storage issues (private mode, etc.)
     }
   }, [rememberApiKey, apiKey, hasHydratedApiKey]);
+
+  useEffect(() => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    try {
+      localStorage.setItem(LAST_CV_TEXT_KEY, text);
+      if (cvAttachmentName) {
+        localStorage.setItem(LAST_CV_NAME_KEY, cvAttachmentName);
+      } else {
+        localStorage.removeItem(LAST_CV_NAME_KEY);
+      }
+    } catch (err) {
+      // Ignore storage issues (private mode, etc.)
+    }
+  }, [text, cvAttachmentName]);
 
   const handleTextChange = useCallback((eOrValue) => {
     const newValue = typeof eOrValue === 'string' ? eOrValue : eOrValue?.target?.value ?? '';
