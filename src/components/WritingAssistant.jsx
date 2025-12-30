@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
-const OPENAI_MODEL = 'gpt-4o-mini';
+const OPENAI_MODEL = 'gpt-5.2';
 
 const initialText = '';
 
@@ -70,32 +70,154 @@ const alignSuggestionsToText = (items, content) =>
     })
     .filter(Boolean);
 
-const extractTextFromPdf = async (file) => {
-  const data = new Uint8Array(await file.arrayBuffer());
-  const pdfjsLib = await import('pdfjs-dist');
-  const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.js?url')).default;
-  pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-
-  const pdf = await pdfjsLib.getDocument({ data }).promise;
-  const pages = [];
-
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
-    const page = await pdf.getPage(pageNum);
-    const content = await page.getTextContent();
-    const textItems = content.items
-      .map((item) => item.str)
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-
-    if (textItems) {
-      pages.push(textItems);
+    const extractTextFromPdf = async (file) => {
+      const data = new Uint8Array(await file.arrayBuffer());
+    
+      const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+      const workerSrc = (await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url"))
+        .default;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+    
+      const pdf = await pdfjsLib.getDocument({ data }).promise;
+    
+      const pageTexts = [];
+    
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
+        const page = await pdf.getPage(pageNum);
+    
+        // Improves mapping to human coordinates (optional but recommended)
+        const viewport = page.getViewport({ scale: 1.0 });
+    
+        const content = await page.getTextContent({
+          includeMarkedContent: true,
+          disableCombineTextItems: false,
+        });
+    
+        const text = buildTextWithLayout(content.items, viewport);
+        if (text.trim()) pageTexts.push(text.trim());
+      }
+    
+      // Keep page boundaries as blank line (tune as you wish)
+      return pageTexts.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+    };
+    
+    // ---- helpers ----
+    
+    function buildTextWithLayout(items, viewport) {
+      // Convert item coordinates to viewport coords and keep useful geometry
+      const mapped = items
+        .filter((it) => it.str && it.str.trim() !== "")
+        .map((it) => {
+          const tx = pdfjsLib.Util.transform(
+            pdfjsLib.Util.transform(viewport.transform, it.transform),
+            [1, 0, 0, 1, 0, 0]
+          );
+    
+          // tx = [a,b,c,d,e,f] where (e,f) is the transformed origin
+          const x = tx[4];
+          const y = tx[5];
+    
+          // Approx item width/height in viewport space
+          const w = it.width * viewport.scale;
+          const h = it.height * viewport.scale;
+    
+          return {
+            str: it.str,
+            x,
+            y,
+            w,
+            h,
+          };
+        });
+    
+      if (!mapped.length) return "";
+    
+      // Sort top-to-bottom then left-to-right
+      // NOTE: in viewport coords, y typically increases downward.
+      mapped.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    
+      // Group into lines by y
+      const lines = [];
+      const yTolerance = 3; // tune: 2–6 depending on PDFs
+      let currentLine = [];
+      let currentY = mapped[0].y;
+    
+      for (const it of mapped) {
+        if (Math.abs(it.y - currentY) <= yTolerance) {
+          currentLine.push(it);
+        } else {
+          lines.push(currentLine);
+          currentLine = [it];
+          currentY = it.y;
+        }
+      }
+      if (currentLine.length) lines.push(currentLine);
+    
+      // For each line, sort by x and stitch fragments with spacing heuristics
+      const lineTexts = [];
+      let prevLineY = null;
+      let prevLineH = null;
+    
+      for (const line of lines) {
+        line.sort((a, b) => a.x - b.x);
+    
+        // Stitch line fragments
+        let out = "";
+        let prev = null;
+    
+        for (const frag of line) {
+          if (!prev) {
+            out += frag.str;
+            prev = frag;
+            continue;
+          }
+    
+          const gap = frag.x - (prev.x + prev.w);
+    
+          // Heuristic: insert a space if there is a visible gap
+          // Threshold scaled by text height; tune factor if needed.
+          const spaceThreshold = Math.max(2, prev.h * 0.25);
+    
+          // Also avoid duplicating spaces if frag already starts with one
+          if (gap > spaceThreshold && !out.endsWith(" ") && !frag.str.startsWith(" ")) {
+            out += " ";
+          }
+    
+          out += frag.str;
+          prev = frag;
+        }
+    
+        out = normalizeLine(out);
+    
+        // Decide newline vs paragraph break
+        if (prevLineY == null) {
+          lineTexts.push(out);
+        } else {
+          const dy = line[0].y - prevLineY;
+          const typicalLineHeight = Math.max(prevLineH ?? 10, line[0].h);
+    
+          // If there is a bigger-than-normal vertical gap, treat as paragraph break
+          const paragraphGap = typicalLineHeight * 1.4;
+    
+          if (dy > paragraphGap) lineTexts.push("", out); // blank line between paragraphs
+          else lineTexts.push(out);
+        }
+    
+        prevLineY = line[0].y;
+        prevLineH = line[0].h;
+      }
+    
+      // Final text
+      return lineTexts.join("\n").replace(/[ \t]+\n/g, "\n");
     }
-  }
-
-  return pages.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
-};
-
+    
+    function normalizeLine(s) {
+      // Keep indentation? If you want indentation, remove the trimStart().
+      // Many PDFs encode indentation as x-position, so trimming usually helps.
+      return s
+        .replace(/\s+/g, " ")
+        .trim();
+    }
 const categoryColors = {
   correctness: { bg: '#FEE2E2', text: '#DC2626', bar: '#EF4444', light: '#FEF2F2' },
   clarity: { bg: '#DBEAFE', text: '#2563EB', bar: '#3B82F6', light: '#EFF6FF' },
@@ -132,8 +254,7 @@ const buildAnalysisMessages = (content, jobDescription) => [
     role: 'user',
     content: `Use the job description to tailor the candidate CV. Respond with a JSON object containing:
 - "score": integer from 0-100 (higher is better).
-- "suggestions": up to 6 items. Each item must have id, type ("correctness", "clarity", "engagement", or "delivery"), title, description, original (exact text span from the CV), replacement (improved version), startIndex, endIndex (character offsets in the CV text, endIndex exclusive). Prioritize suggestions that make the CV better match the job description.
-- "keywords": up to 3 missing keywords to add, each with id, keyword, and description pulled from the job description context.
+- "suggestions":  Each item must have id, type ("correctness", "clarity", "engagement", or "delivery"), title, description, original (exact text span from the CV), replacement (improved version), startIndex, endIndex (character offsets in the CV text, endIndex exclusive). Prioritize suggestions that make the CV better match the job description.
 
 Job description (context only, do NOT index against this text):
 """${jobDescription || 'Not provided'}"""
@@ -188,9 +309,9 @@ async function requestKeywordsFromOpenAI(jobDescription, apiKey, signal) {
     body: JSON.stringify({
       model: OPENAI_MODEL,
       messages: buildKeywordMessages(jobDescription),
-      temperature: 0.2,
-      max_tokens: 800,
-      response_format: { type: 'json_object' }
+      max_completion_tokens: 800,
+      response_format: { type: 'json_object' },
+      temperature: 0.2
     }),
     signal
   });
@@ -260,9 +381,9 @@ async function requestAnalysisFromOpenAI(content, jobDescription, apiKey, signal
     body: JSON.stringify({
       model: OPENAI_MODEL,
       messages: buildAnalysisMessages(content, jobDescription),
-      temperature: 0.2,
-      max_tokens: 3000,
-      response_format: { type: 'json_object' }
+      max_completion_tokens: 4000,
+      response_format: { type: 'json_object' },
+      temperature: 0.2
     }),
     signal
   });
@@ -1040,8 +1161,7 @@ export default function WritingAssistant() {
                     rows={3}
                     className="composer-textarea hide-scrollbar"
                     style={{
-                      minHeight: '74px',
-                      maxHeight: '140px',
+                      minHeight: '250px',
                       overflowY: 'auto',
                       border: '1px solid #E7E5E4',
                       borderRadius: '12px',
@@ -1066,8 +1186,7 @@ export default function WritingAssistant() {
                         }
                       }}
                       style={{
-                        minHeight: '74px',
-                        maxHeight: '140px',
+                        minHeight: '250px',
                         overflowY: 'auto',
                         border: '1px solid #E7E5E4',
                         borderRadius: '12px',
