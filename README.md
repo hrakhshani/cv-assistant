@@ -107,4 +107,4 @@ Edit the `categoryColors` object to change the color scheme for each category.
 
 ## License
 
-MIT
+Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0). Free for research, academic, and experimental use; commercial use requires prior written consent. See `LICENSE` for details and the full legal code.
