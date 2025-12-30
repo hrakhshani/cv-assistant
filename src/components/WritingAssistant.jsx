@@ -7,6 +7,9 @@ const initialText = '';
 
 const initialSuggestions = [];
 const initialKeywords = [];
+const API_KEY_REQUIRED_MESSAGE = 'Enter your OpenAI API key to enable AI-powered suggestions.';
+const API_KEY_STORAGE_KEY = 'writingAssistantApiKey';
+const API_KEY_REMEMBER_KEY = 'writingAssistantRememberApiKey';
 
 const makeSessionTitle = (content) => {
   const cleaned = (content || '').replace(/\s+/g, ' ').trim();
@@ -416,6 +419,9 @@ export default function WritingAssistant() {
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState(null);
+  const [apiKey, setApiKey] = useState('');
+  const [rememberApiKey, setRememberApiKey] = useState(false);
+  const [hasHydratedApiKey, setHasHydratedApiKey] = useState(false);
   const [jobDescription, setJobDescription] = useState('');
   const [cvAttachmentName, setCvAttachmentName] = useState(null);
   const [attachmentError, setAttachmentError] = useState(null);
@@ -435,6 +441,7 @@ export default function WritingAssistant() {
   const requestIdRef = useRef(0);
   const abortControllerRef = useRef(null);
   const fileInputRef = useRef(null);
+  const apiKeyInputRef = useRef(null);
 
   const resetFeedbackState = useCallback(() => {
     setSuggestions([]);
@@ -485,13 +492,13 @@ export default function WritingAssistant() {
       return;
     }
 
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (!apiKey) {
+    const trimmedApiKey = apiKey.trim();
+    if (!trimmedApiKey) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
-      setAnalysisError('Add VITE_OPENAI_API_KEY in a .env file to enable OpenAI-powered suggestions.');
+      setAnalysisError(API_KEY_REQUIRED_MESSAGE);
       setIsAnalyzing(false);
       setAiScore(null);
       setHasAnalyzed(false);
@@ -510,9 +517,9 @@ export default function WritingAssistant() {
     setAnalysisError(null);
 
     try {
-      const extractedKeywords = await requestKeywordsFromOpenAI(jobDesc, apiKey, controller.signal);
+      const extractedKeywords = await requestKeywordsFromOpenAI(jobDesc, trimmedApiKey, controller.signal);
       const missingKeywords = findMissingKeywords(extractedKeywords, content);
-      const result = await requestAnalysisFromOpenAI(content, jobDesc, apiKey, controller.signal);
+      const result = await requestAnalysisFromOpenAI(content, jobDesc, trimmedApiKey, controller.signal);
       if (requestIdRef.current !== requestId) return;
 
       const incomingSuggestions = Array.isArray(result?.suggestions) ? result.suggestions : [];
@@ -566,13 +573,46 @@ export default function WritingAssistant() {
         abortControllerRef.current = null;
       }
     }
-  }, [resetFeedbackState, activeSessionId]);
+  }, [resetFeedbackState, activeSessionId, apiKey]);
 
   useEffect(() => () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
   }, []);
+  
+  useEffect(() => {
+    try {
+      const storedRemember = localStorage.getItem(API_KEY_REMEMBER_KEY);
+      const shouldRemember = storedRemember === 'true';
+      setRememberApiKey(shouldRemember);
+      if (shouldRemember) {
+        const storedKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+        if (storedKey) {
+          setApiKey(storedKey);
+        }
+      }
+    } catch (err) {
+      // Ignore storage issues (private mode, etc.)
+    }
+    setHasHydratedApiKey(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydratedApiKey) return;
+    try {
+      const trimmed = apiKey.trim();
+      if (rememberApiKey && trimmed) {
+        localStorage.setItem(API_KEY_STORAGE_KEY, trimmed);
+        localStorage.setItem(API_KEY_REMEMBER_KEY, 'true');
+      } else {
+        localStorage.removeItem(API_KEY_STORAGE_KEY);
+        localStorage.setItem(API_KEY_REMEMBER_KEY, rememberApiKey ? 'true' : 'false');
+      }
+    } catch (err) {
+      // Ignore storage issues (private mode, etc.)
+    }
+  }, [rememberApiKey, apiKey, hasHydratedApiKey]);
 
   const handleTextChange = useCallback((eOrValue) => {
     const newValue = typeof eOrValue === 'string' ? eOrValue : eOrValue?.target?.value ?? '';
@@ -651,6 +691,23 @@ export default function WritingAssistant() {
       return;
     }
 
+    const trimmedKey = apiKey.trim();
+    if (!trimmedKey) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      setShowAnalysis(false);
+      setIsAnalyzing(false);
+      setHasAnalyzed(false);
+      setAiScore(null);
+      setAnalysisError(API_KEY_REQUIRED_MESSAGE);
+      if (apiKeyInputRef.current) {
+        apiKeyInputRef.current.focus();
+      }
+      return;
+    }
+
     const trimmed = text.trim();
     if (!trimmed) {
       setShowAnalysis(false);
@@ -659,7 +716,7 @@ export default function WritingAssistant() {
     }
     setShowAnalysis(true);
     runAnalysis(text, jobDescription);
-  }, [isParsingAttachment, runAnalysis, text, jobDescription]);
+  }, [apiKey, isParsingAttachment, runAnalysis, text, jobDescription]);
 
   const handleSelectSession = useCallback((sessionId) => {
     const session = sessions.find(s => s.id === sessionId);
@@ -1150,27 +1207,69 @@ export default function WritingAssistant() {
                   gap: '12px'
                 }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '12px', fontWeight: 700, color: '#475569' }}>
-                    Job description / target role
-                  </label>
-                  <textarea
-                    value={jobDescription}
-                    onChange={handleJobDescriptionChange}
-                    placeholder="Paste the job description you want to match against."
-                    rows={3}
-                    className="composer-textarea hide-scrollbar"
-                    style={{
-                      minHeight: '250px',
-                      overflowY: 'auto',
-                      border: '1px solid #E7E5E4',
-                      borderRadius: '12px',
-                      padding: '12px',
-                      background: '#F9FAFB',
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '12px', fontWeight: 700, color: '#475569' }}>
+                      OpenAI API key
+                    </label>
+                    <input
+                      ref={apiKeyInputRef}
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="sk-..."
+                      autoComplete="off"
+                      spellCheck={false}
+                      style={{
+                        border: '1px solid #E7E5E4',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        background: '#F9FAFB',
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontSize: '13px',
+                        color: '#0F172A'
+                      }}
+                    />
+                    <span style={{
                       fontFamily: "'DM Sans', sans-serif",
-                      fontSize: '12px'
-                    }}
-                  />
+                      fontSize: '11px',
+                      color: '#6B7280'
+                    }}>
+                      Stored for this session. Enable "Remember on this browser" to keep it locally.
+                    </span>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'DM Sans', sans-serif", fontSize: '12px', color: '#475569', marginTop: '4px' }}>
+                      <input
+                        type="checkbox"
+                        checked={rememberApiKey}
+                        onChange={(e) => setRememberApiKey(e.target.checked)}
+                        style={{ width: '14px', height: '14px' }}
+                      />
+                      Remember on this browser (stored locally)
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '12px', fontWeight: 700, color: '#475569' }}>
+                      Job description / target role
+                    </label>
+                    <textarea
+                      value={jobDescription}
+                      onChange={handleJobDescriptionChange}
+                      placeholder="Paste the job description you want to match against."
+                      rows={3}
+                      className="composer-textarea hide-scrollbar"
+                      style={{
+                        minHeight: '250px',
+                        overflowY: 'auto',
+                        border: '1px solid #E7E5E4',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        background: '#F9FAFB',
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontSize: '12px'
+                      }}
+                    />
+                  </div>
 
                   <textarea
                       className="composer-textarea hide-scrollbar"
