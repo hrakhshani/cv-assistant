@@ -2,7 +2,7 @@
 
 AI-powered CV optimizer and resume keyword matcher built with React and Vite. Upload a PDF/TXT resume, paste a job description, and get ATS-friendly edits, keyword gaps, and an overall fit score.
 
-![CV optimizer demo](public/animation.gif)
+![til](public/animation.gif)
 
 ## Highlights
 
