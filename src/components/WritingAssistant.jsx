@@ -1258,6 +1258,7 @@ export default function WritingAssistant() {
                       placeholder="Paste the job description you want to match against."
                       rows={3}
                       className="composer-textarea hide-scrollbar"
+                      id= "job_description_text_area"
                       style={{
                         minHeight: '250px',
                         overflowY: 'auto',
