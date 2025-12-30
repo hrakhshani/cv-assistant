@@ -1,75 +1,47 @@
-# Writing Assistant
+# CV Optimizer (AI Resume Tailor)
 
-A Grammarly-inspired writing assistant UI built with React and Vite.
+AI-powered CV optimizer and resume keyword matcher built with React and Vite. Upload a PDF/TXT resume, paste a job description, and get ATS-friendly edits, keyword gaps, and an overall fit score.
 
-## Features
+![CV optimizer demo](public/animation.gif)
 
-- **Real-time text highlighting** — Suggestions are underlined in the editor with category-specific colors
-- **Multiple suggestion types:**
-  - Correctness (red) — Grammar and spelling
-  - Clarity (blue) — Readability improvements
-  - Engagement (green) — Style enhancements
-  - Delivery (yellow) — Tone adjustments
-  - Keywords (purple) — Missing keyword suggestions
-- **Accept/Dismiss actions** — Apply or ignore suggestions
-- **Dynamic scoring** — Overall score updates as you address suggestions
-- **Repositionable keywords** — Click expanded keyword markers or use "Move" button to reposition
+## Highlights
 
-## Getting Started
+- **CV optimizer & resume improver** — Tailors resumes to job descriptions using OpenAI (bring your own API key)
+- **ATS keyword checker** — Extracts job keywords and shows where they are missing in your CV
+- **Grammar, clarity, delivery, and engagement fixes** — Underlines issues directly in the editor with color-coded categories
+- **PDF resume parsing** — Attach a PDF or TXT and keep session history for quick iterations
+- **Interactive editor** — Accept/dismiss suggestions, reposition keyword insertions, and watch the score update live
 
-### Prerequisites
+## Quick Start
 
-- Node.js 18+ installed
-- npm or yarn
+Prerequisites: Node.js 18+, npm or yarn.
 
-### Installation
+```bash
+cd cv-assistant
+npm install
+npm run dev
+# open http://localhost:5173
+```
 
-1. Navigate to the project directory:
-   ```bash
-   cd writing-assistant-app
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-4. Open your browser and visit `http://localhost:5173`
-
-### Build for Production
+### Build & Preview
 
 ```bash
 npm run build
-```
-
-The built files will be in the `dist` directory.
-
-### Preview Production Build
-
-```bash
 npm run preview
 ```
 
 ## Usage
 
-1. **View suggestions** — Hover over underlined text or click suggestion cards in the sidebar
-2. **Accept changes** — Click "Accept" or "Insert" to apply a suggestion
-3. **Dismiss suggestions** — Click "Dismiss" to ignore a suggestion
-4. **Move keywords** — 
-   - Hover over a purple + marker to expand it
-   - Click the expanded marker to enter repositioning mode
-   - Or click "Move" button in the sidebar
-   - Click any drop zone to place the keyword
+1. Paste or upload your CV/resume (PDF or TXT).
+2. Paste the target job description.
+3. Add your OpenAI API key (required for analysis).
+4. Click **Analyze** to get a fit score, ATS keywords, and inline edits.
+5. Accept or dismiss suggestions; drag/drop keyword insertions where they make sense.
 
 ## Project Structure
 
 ```
-writing-assistant-app/
+cv-assistant/
 ├── index.html
 ├── package.json
 ├── vite.config.js
@@ -81,29 +53,9 @@ writing-assistant-app/
         └── WritingAssistant.jsx
 ```
 
-## Customization
+## Search Keywords
 
-### Adding New Suggestions
-
-Edit the `initialSuggestions` array in `WritingAssistant.jsx`:
-
-```javascript
-{
-  id: 10,
-  type: 'keyword', // or 'correctness', 'clarity', 'engagement', 'delivery'
-  title: 'Your title',
-  description: 'Your description',
-  original: '', // empty for insertions
-  replacement: 'text to insert ',
-  startIndex: 100, // position in text
-  endIndex: 100, // same as startIndex for insertions
-  isInsertion: true // true for keywords, false for replacements
-}
-```
-
-### Customizing Colors
-
-Edit the `categoryColors` object to change the color scheme for each category.
+CV optimizer, resume optimizer, ATS resume checker, resume keyword matcher, AI resume writer, CV keyword extractor, PDF resume parser, OpenAI CV analyzer, job description alignment, resume improvement tool.
 
 ## License
 
